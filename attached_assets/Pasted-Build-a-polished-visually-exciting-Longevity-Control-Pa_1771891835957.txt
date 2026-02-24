@@ -1,0 +1,123 @@
+Build a polished, visually exciting “Longevity Control Panel” web app (React + TypeScript). 
+Goal: a clean daily dashboard that estimates a Physiologic Aging Score (PAS) as a 7-day rolling metric (surrogate for pace-of-aging), generates a “Today’s Plan” (diet/exercise/supplement guidance) based on current physiologic signals, and links PAS trends to a long-term “Inflammaging / Disease Trajectory” view. 
+
+DESIGN REQUIREMENTS
+- Look premium: modern cards, soft shadows, good whitespace, consistent typography, subtle animations.
+- One-number-per-screen principle: Home focuses on PAS + Today’s Plan; other metrics are secondary and drill-down.
+- Avoid clutter: progressive disclosure (tabs + detail drawers).
+- Add clear evidence-color badges next to recommendations:
+  - Green = strong evidence
+  - Yellow = moderate evidence
+  - Orange = emerging/experimental
+  - Red = not recommended / caution
+- Provide a “What this means” tooltip explaining PAS and why it’s a 7-day rolling score.
+
+APP STRUCTURE (NAV/TABS)
+1) Home (Daily Control)
+   - Big PAS gauge (0–100) + label “Aging Velocity: Slow / Moderate / Fast”
+   - Small 7-day sparkline of PAS
+   - “Today’s Plan” section with 3 cards:
+     A) Exercise Plan (zone 2 / strength / HIIT / recovery)
+     B) Diet Focus (Mediterranean/DASH default, low-glycemic mode if glucose variability high)
+     C) Supplements (education-first; only suggest with evidence badge + caution)
+   - Each card includes 3 bullet actions and “why” text (expandable).
+
+2) Trends
+   - Charts (each on separate card):
+     - PAS over last 30 days
+     - HRV vs sleep vs resting HR (overlay toggle)
+     - Glucose spikes / meal timing (if available)
+     - Training load (zone 2 minutes, strength sessions, HIIT)
+     - AQI exposure trend
+   - “Intervention Timeline” log: when user changed sleep/alcohol/exercise and how PAS responded.
+
+3) Health Risk (Long-term)
+   - Simple model that maps chronic high PAS + high inflammatory load to long-term risk categories:
+     - Cardiometabolic trajectory
+     - Neurocognitive trajectory
+     - Musculoskeletal/frailty trajectory
+   - Display as 3 risk dials (Low/Moderate/High) with explanation that this is trajectory guidance, not diagnosis.
+
+4) Settings / Integrations
+   - Data sources: Mock Data (default), Manual Entry, CSV import (optional)
+   - Toggle “Experimental longevity stack”
+   - Evidence legend
+   - Apple Health Integration placeholder: show “Connect Apple Health (future)” with the list of fields needed.
+
+DATA MODEL
+Create a unified DailyMetrics type:
+- date
+- hrv (ms)
+- restingHR
+- sleepHours
+- sleepRegularityScore (0–100)
+- steps (optional)
+- vo2max
+- zone2Minutes
+- strengthSessions (0/1)
+- hiitSessions (0/1)
+- alcoholDrinks (0–5)
+- lateEating (boolean)
+- fastingGlucose (optional)
+- glucoseSpikeScore (0–100) (optional: from CGM or self-report)
+- aqi (0–300)
+- notes
+
+CORE COMPUTATIONS
+1) Physiologic Aging Score (PAS)
+- PAS is a 7-day rolling score 0–100 where higher = faster aging velocity.
+- Use weighted sub-scores (all normalized 0–100):
+  A) Recovery subscore: HRV vs baseline + restingHR vs baseline + sleepHours + sleepRegularity
+  B) Metabolic subscore: glucoseSpikeScore + lateEating + fastingGlucose trend (if present)
+  C) Fitness protection: VO2max + zone2Minutes + strengthSessions (reduce PAS)
+  D) Inflammatory behaviors: alcoholDrinks + sleepDebt
+  E) Environmental load: AQI
+- Implement with clear, editable weights in a config object.
+- Provide a baseline computed from last 21 days where possible (e.g., HRV baseline = median of prior 21 days).
+
+2) Inflammatory Load Index (ILI)
+- Separate 0–100 index that explains mechanism: low HRV, sleep disruption, glucose spikes, alcohol, AQI.
+- Show as smaller secondary gauge on Home.
+
+3) Today’s Plan Generator
+Rules examples:
+- If HRV below baseline by >15% OR sleepHours < 6.5 OR restingHR above baseline:
+  -> Exercise: Recovery or Zone 2 only (Green)
+  -> Diet: anti-inflammatory Mediterranean emphasis + early dinner (Green)
+  -> Supplements: magnesium education (Yellow); avoid alcohol (Green)
+- If glucoseSpikeScore > 70 or lateEating true:
+  -> Diet: low-glycemic Mediterranean, post-meal walk (Green)
+  -> Exercise: zone 2 or strength ok if recovery good
+- If PAS trending up for 14 days:
+  -> Recommend deload week, sleep focus, reduce alcohol, stress techniques (Green)
+- If AQI > 100:
+  -> Recommend indoor workouts / mask / air purifier tips (Yellow/Green as appropriate)
+- Provide evidence color for each item; keep supplements mostly Yellow/Orange and place NMN/NR/senolytics under “Experimental” toggle.
+
+EVIDENCE-COLOR BADGES
+- Build a small badge component.
+- Each recommendation item has {text, why, evidenceColor, cautions}.
+
+MOCK DATA
+- Generate 60 days of plausible sample data so the dashboard works immediately.
+- Allow the user to edit today’s values and see PAS/plan update live.
+
+TECHNICAL REQUIREMENTS
+- Use React + TypeScript. Prefer Vite.
+- Use a chart library (Recharts) for sparklines and line charts.
+- Use a component library or clean custom components.
+- Keep code organized: /components, /lib/scoring, /lib/rules, /pages.
+- Write clean, commented code and a README explaining how PAS is computed and where to plug in Apple Health later.
+
+APPLE HEALTH INTEGRATION PLACEHOLDER
+- Create an interface called HealthDataProvider with methods:
+  - getDailyMetrics(dateRange)
+- Implement MockProvider now.
+- Leave a stub AppleHealthProvider (not functional on web) and explain that real Apple Health integration will require:
+  - iOS/macOS native app (Swift/HealthKit) OR
+  - a local bridge service exporting Apple Health data to JSON/CSV for the web dashboard.
+- The UI should show a “Connect Apple Health (coming soon)” step and list the exact fields needed: HRV, sleep duration, resting HR, VO2max.
+
+OUTPUT
+- Provide the full codebase in one project with instructions to run.
+- Ensure it runs in Replit without extra setup beyond install + run.
