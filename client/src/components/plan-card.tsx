@@ -1,19 +1,37 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { EvidenceBadge } from "./evidence-badge";
 import { PlanCategory } from "@shared/schema";
-import { Activity, UtensilsCrossed, Pill, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { Activity, UtensilsCrossed, Pill, Moon, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const iconMap: Record<string, typeof Activity> = {
   activity: Activity,
   utensils: UtensilsCrossed,
   pill: Pill,
+  moon: Moon,
 };
 
 interface PlanCardProps {
   plan: PlanCategory;
+}
+
+function TimingBadge({ timing }: { timing?: "AM" | "PM" | "anytime" }) {
+  if (!timing || timing === "anytime") return null;
+  return (
+    <Badge
+      variant="outline"
+      className={`text-[10px] px-1.5 py-0 h-4 font-semibold border-0 ${
+        timing === "AM"
+          ? "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+          : "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300"
+      }`}
+    >
+      {timing}
+    </Badge>
+  );
 }
 
 export function PlanCard({ plan }: PlanCardProps) {
@@ -39,6 +57,7 @@ export function PlanCard({ plan }: PlanCardProps) {
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-medium flex-1">{item.text}</p>
               <div className="flex items-center gap-1 flex-shrink-0">
+                <TimingBadge timing={item.timing} />
                 <EvidenceBadge color={item.evidenceColor} />
                 <Button
                   size="icon"

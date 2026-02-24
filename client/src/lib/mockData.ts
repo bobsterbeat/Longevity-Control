@@ -8,6 +8,13 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function randomTime(baseHour: number, baseMinute: number, varianceMinutes: number): string {
+  const totalMinutes = baseHour * 60 + baseMinute + randomInt(-varianceMinutes, varianceMinutes);
+  const h = Math.floor(((totalMinutes % 1440) + 1440) % 1440 / 60);
+  const m = ((totalMinutes % 60) + 60) % 60;
+  return `${String(h).padStart(2, "0")}:${m < 30 ? "00" : "30"}`;
+}
+
 export function generateMockData(days = 60): DailyMetrics[] {
   const metrics: DailyMetrics[] = [];
   const today = new Date();
@@ -15,6 +22,10 @@ export function generateMockData(days = 60): DailyMetrics[] {
   let baseHRV = randomBetween(45, 65);
   let baseHR = randomBetween(58, 68);
   let baseVO2 = randomBetween(38, 48);
+
+  // Base sleep schedule with some person-to-person variability
+  const baseBedtimeHour = randomInt(21, 23);
+  const baseWakeHour = randomInt(6, 7);
 
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(today);
@@ -56,6 +67,27 @@ export function generateMockData(days = 60): DailyMetrics[] {
     const aqiBase = randomBetween(20, 80);
     const aqiSpike = Math.random() > 0.85 ? randomInt(60, 150) : 0;
 
+    // Sleep timing: weekends tend toward later bedtime
+    const bedtimeVariance = isWeekend ? 45 : 20;
+    const wakeVariance = isWeekend ? 60 : 25;
+    const bedtimeOffset = isWeekend ? 45 : 0; // 45 min later on weekends
+    const wakeOffset = isWeekend ? 60 : 0;    // 60 min later on weekends
+
+    const bedtime = randomTime(baseBedtimeHour, bedtimeOffset, bedtimeVariance);
+    const wakeTime = randomTime(baseWakeHour, wakeOffset + 30, wakeVariance);
+
+    // Awakenings correlated with alcohol and poor sleep
+    const awakeningsBase = alcoholDrinks > 1 ? randomInt(1, 4) : randomInt(0, 2);
+    const awakenings = Math.min(6, awakeningsBase);
+
+    const alcoholTiming = alcoholDrinks > 0
+      ? `${String(randomInt(18, 22)).padStart(2, "0")}:00`
+      : undefined;
+
+    const lateEatingTime = lateEating
+      ? `${String(randomInt(19, 22)).padStart(2, "0")}:${Math.random() > 0.5 ? "30" : "00"}`
+      : undefined;
+
     metrics.push({
       date: dateStr,
       hrv: Math.round(Math.max(15, baseHRV + hrvVariation)),
@@ -75,6 +107,11 @@ export function generateMockData(days = 60): DailyMetrics[] {
       glucoseSpikeScore: hasCGM ? glucoseBase : undefined,
       aqi: Math.round(Math.min(250, aqiBase + aqiSpike)),
       notes: "",
+      bedtime,
+      wakeTime,
+      awakenings,
+      alcoholTiming,
+      lateEatingTime,
     });
   }
 

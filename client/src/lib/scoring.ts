@@ -18,6 +18,63 @@ export function getBaseline(metrics: DailyMetrics[], field: keyof DailyMetrics, 
   return sorted[Math.floor(sorted.length / 2)];
 }
 
+export function getBaselineSD(metrics: DailyMetrics[], field: keyof DailyMetrics, days = 21): number {
+  const recent = metrics.slice(-days);
+  const values = recent
+    .map((m) => m[field])
+    .filter((v): v is number => typeof v === "number");
+  if (values.length < 2) return 0;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1);
+  return Math.sqrt(variance);
+}
+
+function parseTimeToMinutes(timeStr: string): number {
+  const parts = timeStr.split(":");
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1] ?? "0", 10);
+  return h * 60 + m;
+}
+
+function computeSD(values: number[]): number {
+  if (values.length < 2) return 0;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1);
+  return Math.sqrt(variance);
+}
+
+/** Returns a 0-100 score for sleep timing consistency (higher = more consistent). */
+export function computeSleepConsistency(metrics: DailyMetrics[], days = 7): number {
+  const recent = metrics.slice(-days);
+
+  const bedtimes = recent
+    .filter((m) => m.bedtime)
+    .map((m) => {
+      const mins = parseTimeToMinutes(m.bedtime!);
+      // Adjust post-midnight times (e.g. 00:30 → 24:30) to avoid wraparound
+      return mins < 12 * 60 ? mins + 24 * 60 : mins;
+    });
+
+  const wakeTimes = recent
+    .filter((m) => m.wakeTime)
+    .map((m) => parseTimeToMinutes(m.wakeTime!));
+
+  if (bedtimes.length < 3) {
+    // Fall back to sleepRegularityScore average
+    const avg = recent.reduce((sum, m) => sum + m.sleepRegularityScore, 0) / recent.length;
+    return Math.round(avg);
+  }
+
+  const bedtimeSD = computeSD(bedtimes);
+  const wakeTimeSD = wakeTimes.length >= 3 ? computeSD(wakeTimes) : bedtimeSD;
+
+  // SD of 0 min → 100, SD of 60 min → 0
+  const bedScore = Math.max(0, Math.min(100, 100 - (bedtimeSD / 60) * 100));
+  const wakeScore = Math.max(0, Math.min(100, 100 - (wakeTimeSD / 60) * 100));
+
+  return Math.round((bedScore + wakeScore) / 2);
+}
+
 function computeRecoverySubscore(today: DailyMetrics, hrvBaseline: number, hrBaseline: number): number {
   const hrvDeviation = hrvBaseline > 0 ? ((hrvBaseline - today.hrv) / hrvBaseline) * 100 : 50;
   const hrvScore = clamp(50 + hrvDeviation * 2, 0, 100);
@@ -108,9 +165,7 @@ export function computeILI(today: DailyMetrics, allMetrics: DailyMetrics[]): num
     : 0;
 
   const glucoseSpikes = today.glucoseSpikeScore ?? 25;
-
   const alcoholLoad = normalize(today.alcoholDrinks, 0, 4);
-
   const aqiLoad = normalize(today.aqi, 0, 200);
 
   const ili =
@@ -152,4 +207,35 @@ export function computeSubscores(today: DailyMetrics, allMetrics: DailyMetrics[]
     inflammatory: Math.round(computeInflammatoryBehaviors(today)),
     environmental: Math.round(computeEnvironmentalLoad(today)),
   };
+}
+
+export interface PASDriver {
+  label: string;
+  rawScore: number;
+  /** PAS points this component contributes above/below neutral (±50 baseline).
+   *  Positive = increasing PAS (bad), Negative = protective (good). */
+  delta: number;
+}
+
+/**
+ * Computes each subscore's deviation from neutral and returns all drivers sorted by delta descending.
+ * Callers can filter delta > 0 for "increasing" and delta < 0 for "protective".
+ */
+export function computeTopDrivers(today: DailyMetrics, allMetrics: DailyMetrics[]): PASDriver[] {
+  const hrvBaseline = getBaseline(allMetrics, "hrv");
+  const hrBaseline = getBaseline(allMetrics, "restingHR");
+
+  const recovery = computeRecoverySubscore(today, hrvBaseline, hrBaseline);
+  const metabolic = computeMetabolicSubscore(today);
+  const fitness = computeFitnessProtection(today);
+  const inflammatory = computeInflammatoryBehaviors(today);
+  const environmental = computeEnvironmentalLoad(today);
+
+  return [
+    { label: "Recovery", rawScore: Math.round(recovery), delta: Math.round((recovery - 50) * PAS_WEIGHTS.recovery) },
+    { label: "Metabolic", rawScore: Math.round(metabolic), delta: Math.round((metabolic - 50) * PAS_WEIGHTS.metabolic) },
+    { label: "Fitness", rawScore: Math.round(fitness), delta: Math.round((fitness - 50) * PAS_WEIGHTS.fitness) },
+    { label: "Inflammatory", rawScore: Math.round(inflammatory), delta: Math.round((inflammatory - 50) * PAS_WEIGHTS.inflammatory) },
+    { label: "Environmental", rawScore: Math.round(environmental), delta: Math.round((environmental - 50) * PAS_WEIGHTS.environmental) },
+  ].sort((a, b) => b.delta - a.delta);
 }

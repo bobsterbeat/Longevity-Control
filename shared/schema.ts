@@ -17,6 +17,13 @@ export const dailyMetricsSchema = z.object({
   glucoseSpikeScore: z.number().min(0).max(100).optional(),
   aqi: z.number().min(0).max(300),
   notes: z.string(),
+  // Sleep timing fields
+  bedtime: z.string().optional(),        // "22:30" HH:MM format
+  wakeTime: z.string().optional(),       // "06:30" HH:MM format
+  awakenings: z.number().min(0).max(10).optional(),
+  // Behavior timing
+  alcoholTiming: z.string().optional(),  // "20:00" HH:MM format
+  lateEatingTime: z.string().optional(), // "21:30" HH:MM format
 });
 
 export type DailyMetrics = z.infer<typeof dailyMetricsSchema>;
@@ -26,6 +33,9 @@ export interface PlanItem {
   why: string;
   evidenceColor: "green" | "yellow" | "orange" | "red";
   cautions?: string;
+  timing?: "AM" | "PM" | "anytime";
+  isExperimental?: boolean;
+  group?: "suggested" | "stack";
 }
 
 export interface PlanCategory {
@@ -38,6 +48,7 @@ export interface TodaysPlan {
   exercise: PlanCategory;
   diet: PlanCategory;
   supplements: PlanCategory;
+  sleep: PlanCategory;
 }
 
 export interface Intervention {
