@@ -17,7 +17,7 @@ const ZONES = [
   { from: 70, to: 100, label: "Rapid", color: "#ef4444" },
 ];
 
-export function PASGauge({ value, size = 260, showLabel = true }: PASGaugeProps) {
+export function PASGauge({ value, size = 240, showLabel = true }: PASGaugeProps) {
   const [animatedValue, setAnimatedValue] = useState(0);
 
   useEffect(() => {
@@ -27,95 +27,78 @@ export function PASGauge({ value, size = 260, showLabel = true }: PASGaugeProps)
 
   const { text: velocityText, color: velocityColor } = getPASLabel(value);
 
+  // Semicircle: 180° sweep from left (180°) → right (0°) through the top
   const trackWidth = 14;
-  const radius = (size - 40) / 2;
+  const radius = (size - 60) / 2;   // extra margin for tick labels
   const cx = size / 2;
-  const cy = size / 2 + 16;
-
-  const startAngle = 220;
-  const endAngle = -40;
-  const totalAngle = startAngle - endAngle;
+  const cy = size / 2;               // center at flat bottom edge
+  const startAngle = 180;
+  const endAngle = 0;
+  const totalAngle = 180;
+  const svgHeight = cy + 12;         // top half + needle-base margin
 
   const polarToCartesian = (angle: number, r: number = radius) => {
     const rad = (angle * Math.PI) / 180;
-    return {
-      x: cx + r * Math.cos(rad),
-      y: cy - r * Math.sin(rad),
-    };
+    return { x: cx + r * Math.cos(rad), y: cy - r * Math.sin(rad) };
   };
 
   const describeArc = (start: number, end: number, r: number = radius) => {
     const s = polarToCartesian(start, r);
     const e = polarToCartesian(end, r);
-    const largeArc = start - end > 180 ? 1 : 0;
-    return `M ${s.x} ${s.y} A ${r} ${r} 0 ${largeArc} 0 ${e.x} ${e.y}`;
+    // sweep=1 = clockwise in SVG (y-down) → draws through the top
+    return `M ${s.x} ${s.y} A ${r} ${r} 0 0 1 ${e.x} ${e.y}`;
   };
 
-  const needleAngle = startAngle - (animatedValue / 100) * totalAngle;
+  const valueToAngle = (v: number) => startAngle - (v / 100) * totalAngle;
+
+  const needleAngle = valueToAngle(animatedValue);
   const needleRad = (needleAngle * Math.PI) / 180;
-  const needleLength = radius - 24;
+  const needleLength = radius - 22;
   const needleTip = {
     x: cx + needleLength * Math.cos(needleRad),
     y: cy - needleLength * Math.sin(needleRad),
   };
   const needleBaseWidth = 4;
   const perpRad = needleRad + Math.PI / 2;
-  const needleBase1 = {
-    x: cx + needleBaseWidth * Math.cos(perpRad),
-    y: cy - needleBaseWidth * Math.sin(perpRad),
-  };
-  const needleBase2 = {
-    x: cx - needleBaseWidth * Math.cos(perpRad),
-    y: cy + needleBaseWidth * Math.sin(perpRad),
-  };
+  const needleBase1 = { x: cx + needleBaseWidth * Math.cos(perpRad), y: cy - needleBaseWidth * Math.sin(perpRad) };
+  const needleBase2 = { x: cx - needleBaseWidth * Math.cos(perpRad), y: cy + needleBaseWidth * Math.sin(perpRad) };
 
   const getValueColor = (val: number) => {
-    const zone = ZONES.find(z => val >= z.from && val < z.to) || ZONES[ZONES.length - 1];
+    const zone = ZONES.find((z) => val >= z.from && val < z.to) || ZONES[ZONES.length - 1];
     return zone.color;
   };
 
   return (
     <div className="flex flex-col items-center" data-testid="gauge-pas">
-      <div className="relative" style={{ width: size, height: size * 0.78 }}>
-        <svg width={size} height={size * 0.78} viewBox={`0 0 ${size} ${size * 0.78}`}>
+      <div className="relative" style={{ width: size, height: svgHeight + 50 }}>
+        <svg width={size} height={svgHeight} viewBox={`0 0 ${size} ${svgHeight}`} overflow="visible">
           <defs>
             <filter id="needleShadow">
               <feDropShadow dx="0" dy="1" stdDeviation="2" floodOpacity="0.2" />
             </filter>
-            <filter id="glowFilter">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
           </defs>
 
-          {ZONES.map((zone) => {
-            const zoneStart = startAngle - (zone.from / 100) * totalAngle;
-            const zoneEnd = startAngle - (zone.to / 100) * totalAngle;
-            return (
-              <path
-                key={zone.label}
-                d={describeArc(zoneStart, zoneEnd)}
-                fill="none"
-                stroke={zone.color}
-                strokeWidth={trackWidth}
-                strokeLinecap="butt"
-                opacity={0.25}
-              />
-            );
-          })}
+          {/* Zone tracks (dim background) */}
+          {ZONES.map((zone) => (
+            <path
+              key={zone.label}
+              d={describeArc(valueToAngle(zone.from), valueToAngle(zone.to))}
+              fill="none"
+              stroke={zone.color}
+              strokeWidth={trackWidth}
+              strokeLinecap="butt"
+              opacity={0.25}
+            />
+          ))}
 
+          {/* Active fill */}
           {ZONES.map((zone) => {
-            const zoneStart = startAngle - (zone.from / 100) * totalAngle;
-            const clampedValue = Math.min(Math.max(animatedValue, zone.from), zone.to);
-            const zoneEnd = startAngle - (clampedValue / 100) * totalAngle;
             if (animatedValue < zone.from) return null;
+            const clamped = Math.min(Math.max(animatedValue, zone.from), zone.to);
             return (
               <path
                 key={`active-${zone.label}`}
-                d={describeArc(zoneStart, zoneEnd)}
+                d={describeArc(valueToAngle(zone.from), valueToAngle(clamped))}
                 fill="none"
                 stroke={zone.color}
                 strokeWidth={trackWidth}
@@ -125,108 +108,56 @@ export function PASGauge({ value, size = 260, showLabel = true }: PASGaugeProps)
             );
           })}
 
+          {/* Zone separators */}
           {ZONES.map((zone, i) => {
             if (i === 0) return null;
-            const angle = startAngle - (zone.from / 100) * totalAngle;
+            const angle = valueToAngle(zone.from);
             const outer = polarToCartesian(angle, radius + trackWidth / 2 + 1);
             const inner = polarToCartesian(angle, radius - trackWidth / 2 - 1);
             return (
-              <line
-                key={`sep-${i}`}
-                x1={outer.x}
-                y1={outer.y}
-                x2={inner.x}
-                y2={inner.y}
-                stroke="hsl(var(--background))"
-                strokeWidth="2"
-              />
+              <line key={`sep-${i}`} x1={outer.x} y1={outer.y} x2={inner.x} y2={inner.y}
+                stroke="hsl(var(--background))" strokeWidth="2" />
             );
           })}
 
+          {/* Tick labels */}
           {[0, 25, 50, 75, 100].map((tick) => {
-            const angle = startAngle - (tick / 100) * totalAngle;
+            const angle = valueToAngle(tick);
             const labelRadius = radius + trackWidth / 2 + 14;
-            const rad = (angle * Math.PI) / 180;
-            const labelPoint = {
-              x: cx + labelRadius * Math.cos(rad),
-              y: cy - labelRadius * Math.sin(rad),
-            };
+            const pt = polarToCartesian(angle, labelRadius);
+            const anchor = tick === 0 ? "end" : tick === 100 ? "start" : "middle";
             return (
-              <text
-                key={tick}
-                x={labelPoint.x}
-                y={labelPoint.y}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fill="hsl(var(--muted-foreground))"
-                fontSize="10"
-                fontWeight="500"
-              >
+              <text key={tick} x={pt.x} y={pt.y} textAnchor={anchor} dominantBaseline="middle"
+                fill="hsl(var(--muted-foreground))" fontSize="10" fontWeight="500">
                 {tick}
               </text>
             );
           })}
 
-          {ZONES.map((zone) => {
-            const midVal = (zone.from + zone.to) / 2;
-            const angle = startAngle - (midVal / 100) * totalAngle;
-            const labelR = radius - trackWidth / 2 - 14;
-            const rad = (angle * Math.PI) / 180;
-            const pt = {
-              x: cx + labelR * Math.cos(rad),
-              y: cy - labelR * Math.sin(rad),
-            };
-            const rotDeg = -angle + 90;
-            return (
-              <text
-                key={`lbl-${zone.label}`}
-                x={pt.x}
-                y={pt.y}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fill="hsl(var(--muted-foreground))"
-                fontSize="7"
-                fontWeight="600"
-                letterSpacing="0.5"
-                opacity="0.6"
-                transform={`rotate(${rotDeg}, ${pt.x}, ${pt.y})`}
-              >
-                {zone.label.toUpperCase()}
-              </text>
-            );
-          })}
-
+          {/* Needle */}
           <polygon
             points={`${needleTip.x},${needleTip.y} ${needleBase1.x},${needleBase1.y} ${needleBase2.x},${needleBase2.y}`}
             fill={getValueColor(animatedValue)}
-            style={{
-              transition: "all 1.2s cubic-bezier(0.4, 0, 0.2, 1)",
-              filter: "url(#needleShadow)",
-            }}
+            style={{ transition: "all 1.2s cubic-bezier(0.4, 0, 0.2, 1)", filter: "url(#needleShadow)" }}
           />
-          <circle
-            cx={cx}
-            cy={cy}
-            r={6}
-            fill={getValueColor(animatedValue)}
-            stroke="hsl(var(--background))"
-            strokeWidth="2"
-            style={{ transition: "fill 1s ease" }}
-          />
+          <circle cx={cx} cy={cy} r={6} fill={getValueColor(animatedValue)}
+            stroke="hsl(var(--background))" strokeWidth="2"
+            style={{ transition: "fill 1s ease" }} />
         </svg>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-0">
+        {/* Value + label below arc center */}
+        <div className="absolute flex flex-col items-center" style={{ left: 0, right: 0, top: svgHeight + 6 }}>
           <span
             className="text-4xl font-bold tabular-nums tracking-tight"
-            style={{
-              color: getValueColor(value),
-              transition: "color 0.5s ease",
-            }}
+            style={{ color: getValueColor(value), transition: "color 0.5s ease" }}
             data-testid="text-pas-value"
           >
             {value}
           </span>
           <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">PAS</span>
+          <span className="text-xs text-muted-foreground mt-1 tabular-nums">
+            {(value / 50).toFixed(1)}× avg aging rate
+          </span>
         </div>
       </div>
 
@@ -245,12 +176,15 @@ export function PASGauge({ value, size = 260, showLabel = true }: PASGaugeProps)
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 <p className="font-medium mb-1">Physiologic Aging Score (PAS)</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  A 7-day rolling composite score (0–100) estimating your pace of biological aging relative to average.
+                  <strong className="text-foreground"> 50 = average aging rate (1.0×)</strong> for a healthy adult.
+                  A score of 35 means you're aging at roughly 0.7× the average rate — 30% slower than typical.
+                  A score of 70 would mean 1.4× — 40% faster.
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  PAS is a 7-day rolling composite score (0-100) that estimates your pace of biological aging.
-                  Lower is better. It combines recovery signals (HRV, sleep), metabolic markers (glucose),
-                  fitness protection (VO2max, exercise), inflammatory behaviors (alcohol, sleep debt),
-                  and environmental load (air quality). Think of it as a daily speedometer for how fast
-                  you're aging - not a diagnosis, but a directional guide.
+                  Combines: recovery (HRV, sleep), metabolic (glucose), fitness (VO2max, exercise),
+                  inflammatory (alcohol, sleep debt), and environmental (air quality) signals.
                 </p>
               </TooltipContent>
             </Tooltip>

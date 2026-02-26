@@ -11,12 +11,14 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Home, TrendingUp, ShieldAlert, Settings, Dna } from "lucide-react";
+import { Home, TrendingUp, ShieldAlert, Settings, Dna, FlaskConical, Activity } from "lucide-react";
 
 const navItems = [
   { title: "Daily Control", url: "/", icon: Home },
   { title: "Trends", url: "/trends", icon: TrendingUp },
   { title: "Health Risk", url: "/health-risk", icon: ShieldAlert },
+  { title: "Biomarkers", url: "/biomarkers", icon: FlaskConical },
+  { title: "Capacity", url: "/capacity", icon: Activity },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

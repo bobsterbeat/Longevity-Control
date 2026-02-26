@@ -14,6 +14,8 @@ import HomePage from "@/pages/home";
 import TrendsPage from "@/pages/trends";
 import HealthRiskPage from "@/pages/health-risk";
 import SettingsPage from "@/pages/settings";
+import BiomarkersPage from "@/pages/biomarkers";
+import PhysiologicCapacityPage from "@/pages/physiologic-capacity";
 
 function Router() {
   return (
@@ -21,6 +23,8 @@ function Router() {
       <Route path="/" component={HomePage} />
       <Route path="/trends" component={TrendsPage} />
       <Route path="/health-risk" component={HealthRiskPage} />
+      <Route path="/biomarkers" component={BiomarkersPage} />
+      <Route path="/capacity" component={PhysiologicCapacityPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
